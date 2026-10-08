@@ -2,7 +2,7 @@
 
 A hands-on home lab where I built a small company network in the cloud: a Windows Server 2022 domain controller, a Windows 11 client joined to the domain, department OUs, role-based security groups, Group Policy, and common help desk tasks like account lockouts, password resets, and offboarding.
 
-**Tools:** Microsoft Azure, Windows Server 2022, Active Directory Domain Services, DNS, Group Policy, PowerShell, Windows 11, Remote Desktop (Windows App on macOS)
+Tools: Microsoft Azure, Windows Server 2022, Active Directory Domain Services, DNS, Group Policy, PowerShell, Windows 11, Remote Desktop (Windows App on macOS)
 
 ---
 
@@ -53,14 +53,22 @@ lab.local
 
 ### 2. Domain controller (DC01)
 - Deployed a Windows Server 2022 VM and restricted the RDP rule to my public IP only.
-- Set DC01's private IP from dynamic to **static (10.0.0.4)**, because every computer in the domain depends on it for DNS.
+- Set DC01's private IP from dynamic to static (10.0.0.4), because every computer in the domain depends on it for DNS.
 - Installed the **Active Directory Domain Services** role and promoted DC01 to a domain controller for a new forest, **lab.local**, with integrated DNS.
 - Pointed the virtual network's DNS setting to `10.0.0.4` so new VMs automatically use DC01 for DNS.
 
+![AD DS role installation succeeded](screenshots/02-adds-install-succeeded.png)
+
+![DC01 listed in the Domain Controllers OU](screenshots/03-dc01-domain-controller.png)
+
 ### 3. Organizational structure
-- Created OUs for **IT, HR, Sales, Workstations,** and **Security Groups**.
+- Created OUs for IT, HR, Sales, Workstations, and Security Groups**.
 - Created users in their department OUs.
-- Created **role-based security groups** (IT-Admins, HR-Staff, Sales-Staff) and added members, so access can be granted to a group instead of to individual users.
+- Created role-based security groups (IT-Admins, HR-Staff, Sales-Staff) and added members, so access can be granted to a group instead of to individual users.
+
+![Department OUs in Active Directory Users and Computers](screenshots/04-ous.png)
+
+![Sales-Staff security group members](screenshots/05-security-group-members.png)
 
 ### 4. Automation with PowerShell
 Created a user and added them to a group from the command line:
@@ -72,11 +80,15 @@ Add-ADGroupMember -Identity "IT-Admins" -Members "alee"
 Get-ADUser alee | Select-Object Name, Enabled, DistinguishedName
 ```
 
+![Creating a user with PowerShell and fixing the name](screenshots/06-powershell-new-aduser.png)
+
 ### 5. Group Policy
 | GPO | Linked to | Setting | Purpose |
 |---|---|---|---|
 | Default Domain Policy | `lab.local` | Account lockout threshold: 5 invalid attempts (15-minute lockout) | Slows down password-guessing attacks. Password and lockout policies only work at the domain level. |
 | Sales - Block Control Panel | Sales OU | Prohibit access to Control Panel and PC settings | Shows how one department can be restricted without affecting others |
+
+![Sales - Block Control Panel GPO linked to the Sales OU](screenshots/07-gpo-linked-sales.png)
 
 ### 6. Windows 11 client and domain join
 - Deployed CLIENT01 on the same virtual network.
@@ -89,10 +101,18 @@ Add-Computer -DomainName lab.local -Credential LAB\labadmin -Restart
 - Moved CLIENT01 from the default Computers container into the **Workstations** OU, since Group Policy can't be linked to the default containers.
 - Added `LAB\Domain Users` to CLIENT01's local Remote Desktop Users group so domain users could sign in remotely for testing.
 
+![CLIENT01 using DC01 (10.0.0.4) for DNS](screenshots/08-client-dns-check.png)
+
+![CLIENT01 joined to lab.local](screenshots/09-domain-join-confirmed.png)
+
+![CLIENT01 in the Workstations OU](screenshots/10-client-in-workstations-ou.png)
+
 ### 7. Testing Group Policy
 - Signed in to CLIENT01 as **lab\labadmin** (not in Sales): Control Panel opened normally.
 - Signed in as **lab\jsmith** (Sales): Control Panel was blocked with *"This operation has been cancelled due to restrictions in effect on this computer."*
 - This confirmed the policy applies **only** to users in the Sales OU.
+
+![Control Panel blocked for lab\jsmith by Group Policy](screenshots/11-gpo-control-panel-blocked.png)
 
 ### 8. Help desk drills
 | Ticket | What I did |
@@ -100,6 +120,18 @@ Add-Computer -DomainName lab.local -Credential LAB\labadmin -Restart
 | **Locked-out user** | Entered a wrong password 5 times as jsmith until the account locked (error 0xd07). On DC01, found the account with `Search-ADAccount -LockedOut`, unlocked it with `Unlock-ADAccount -Identity jsmith`, and confirmed no accounts were still locked. |
 | **Forgotten password** | Reset Jane Doe's password in ADUC and required her to change it at next logon, so the help desk never knows the user's real password. |
 | **Employee offboarding** | Disabled Maria Garcia's account instead of deleting it, which keeps her files and history available and lets IT re-enable her if needed. Verified with `Get-ADUser mgarcia \| Select-Object Name, Enabled` → `False`. |
+
+**Locked out, then unlocked:**
+
+![Account locked after 5 failed attempts](screenshots/12-account-locked.png)
+
+![Finding and unlocking the account with PowerShell](screenshots/13-unlock-adaccount.png)
+
+**Password reset and offboarding:**
+
+![Password reset for Jane Doe](screenshots/14-password-reset.png)
+
+![Maria Garcia account disabled](screenshots/15-account-disabled.png)
 
 ---
 
@@ -110,6 +142,8 @@ Add-Computer -DomainName lab.local -Credential LAB\labadmin -Restart
 - **Cause:** My Azure for Students subscription has an **Allowed resource deployment regions** policy, and East US wasn't allowed.
 - **Fix:** Found the policy under **Policy → Assignments**, read its allowed-locations parameter, and redeployed in **North Central US**.
 - **Lesson:** Organizations use Azure Policy to control where resources can be created. When a deployment fails, read the error and check what policies apply.
+
+![Azure Policy allowed deployment regions](screenshots/01-azure-policy-regions.png)
 
 ### 2. VM size unavailable
 - **Error:** Standard_B2s showed as "Size not available" in North Central US.
@@ -160,31 +194,29 @@ Read the error message. Most of my PowerShell mistakes were a missing or extra s
 
 ---
 
-## Screenshots
+## Screenshot Index
 
-| # | Screenshot | File |
-|---|---|---|
-| 1 | Azure Policy "Allowed resource deployment regions" | `screenshots/01-azure-policy-regions.png` |
-| 2 | AD DS installation succeeded | `screenshots/02-adds-install-succeeded.png` |
-| 3 | ADUC showing DC01 in Domain Controllers | `screenshots/03-dc01-domain-controller.png` |
-| 4 | OUs created | `screenshots/04-ous.png` |
-| 5 | Sales-Staff group members | `screenshots/05-security-group-members.png` |
-| 6 | PowerShell user creation and name fix | `screenshots/06-powershell-new-aduser.png` |
-| 7 | Group Policy Management: Sales GPO linked | `screenshots/07-gpo-linked-sales.png` |
-| 8 | CLIENT01 DNS check (`ipconfig` and `nslookup`) | `screenshots/08-client-dns-check.png` |
-| 9 | Domain join confirmed (`whoami` and domain) | `screenshots/09-domain-join-confirmed.png` |
-| 10 | CLIENT01 in the Workstations OU | `screenshots/10-client-in-workstations-ou.png` |
-| 11 | **Control Panel blocked for lab\jsmith** | `screenshots/11-gpo-control-panel-blocked.png` |
-| 12 | Account locked out (error 0xd07) | `screenshots/12-account-locked.png` |
-| 13 | Unlock with PowerShell | `screenshots/13-unlock-adaccount.png` |
-| 14 | Password reset confirmation | `screenshots/14-password-reset.png` |
-| 15 | Disabled account (offboarding) | `screenshots/15-account-disabled.png` |
-
-![Control Panel blocked by Group Policy](screenshots/11-gpo-control-panel-blocked.png)
+| # | Screenshot |
+|---|---|
+| 1 | [Azure Policy "Allowed resource deployment regions"](screenshots/01-azure-policy-regions.png) |
+| 2 | [AD DS installation succeeded](screenshots/02-adds-install-succeeded.png) |
+| 3 | [DC01 in Domain Controllers](screenshots/03-dc01-domain-controller.png) |
+| 4 | [OUs created](screenshots/04-ous.png) |
+| 5 | [Sales-Staff group members](screenshots/05-security-group-members.png) |
+| 6 | [PowerShell user creation and name fix](screenshots/06-powershell-new-aduser.png) |
+| 7 | [Sales GPO linked](screenshots/07-gpo-linked-sales.png) |
+| 8 | [CLIENT01 DNS check](screenshots/08-client-dns-check.png) |
+| 9 | [Domain join confirmed](screenshots/09-domain-join-confirmed.png) |
+| 10 | [CLIENT01 in the Workstations OU](screenshots/10-client-in-workstations-ou.png) |
+| 11 | [**Control Panel blocked for lab\jsmith**](screenshots/11-gpo-control-panel-blocked.png) |
+| 12 | [Account locked out (error 0xd07)](screenshots/12-account-locked.png) |
+| 13 | [Unlock with PowerShell](screenshots/13-unlock-adaccount.png) |
+| 14 | [Password reset](screenshots/14-password-reset.png) |
+| 15 | [Disabled account (offboarding)](screenshots/15-account-disabled.png) |
 
 ---
 
 ## Next Steps
-- Build an **osTicket** help desk and work tickets against this lab
-- Deploy **Wazuh SIEM** to collect logs from DC01 and CLIENT01 and alert on failed logins
-- Earn **CompTIA Security+**
+- Build an osTicket help desk and work tickets against this lab
+- Deploy Wazuh SIEM to collect logs from DC01 and CLIENT01 and alert on failed logins
+- Earn CompTIA Security+
