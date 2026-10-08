@@ -151,13 +151,12 @@ I built this lab with help from Claude, an AI assistant, which guided me step by
 ---
 
 ## What I Learned
-
-*(Write this section in your own words. Some ideas:)*
-- *How a domain controller, DNS, and client computers depend on each other, and why DNS has to be right before a domain join*
-- *Why OUs exist and why Group Policy is linked to OUs instead of the default containers*
-- *How role-based security groups make access management easier and safer*
-- *Common help desk tasks (unlocks, resets, offboarding) and why we disable accounts instead of deleting them*
-- *How to work within cloud restrictions such as policies, capacity, and cost*
+DNS has to be right before anything else works. CLIENT01 couldn't join the domain until it used DC01 for DNS, because that's how it finds the domain controller. Azure's default DNS had never heard of lab.local.
+OUs and security groups do different jobs. OUs are like departments (IT, HR, Sales) and are where Group Policy gets applied. Security groups are about access. A user can only be in one OU but can be in many groups.
+Group Policy only applies where it's linked. When I tested as labadmin, Control Panel still opened and I thought the policy was broken. Then I realized labadmin isn't in the Sales OU. Logged in as jsmith, it was blocked exactly as intended.
+Disable, don't delete. When someone leaves, disabling their account blocks access right away but keeps their files and history, and it can be undone if they come back.
+Security settings are a balance. A 5-attempt lockout gives real users room to mistype while stopping someone guessing passwords. The trade-off is that real users sometimes get locked out, which becomes a help desk ticket.
+Read the error message. Most of my PowerShell mistakes were a missing or extra space, and the error told me exactly where the problem was.
 
 ---
 
